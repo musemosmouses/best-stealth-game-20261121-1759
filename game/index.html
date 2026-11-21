@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Night Archive — a stealth game</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0b0d16;
+    color: #e8eaf2;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 12px 16px;
+  }
+  header {
+    width: 960px;
+    max-width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 6px 2px 10px;
+  }
+  header h1 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 22px;
+    letter-spacing: 2px;
+    color: #ffd640;
+    white-space: nowrap;
+  }
+  header h1 span { color: #59e3ff; font-size: 13px; letter-spacing: 3px; }
+  .hud { display: flex; align-items: center; gap: 16px; margin-left: auto; font-size: 14px; }
+  .hud .charts { color: #59e3ff; white-space: nowrap; }
+  .hud .pebbles, .hud .timer { color: #c9cddd; white-space: nowrap; }
+  .suspicion-wrap { display: flex; align-items: center; gap: 6px; }
+  .suspicion-wrap label { font-size: 11px; letter-spacing: 1px; color: #9aa0b5; }
+  .suspicion-bar {
+    width: 130px; height: 10px;
+    background: #1a1e2e; border: 1px solid #3a415a; border-radius: 5px;
+    overflow: hidden;
+  }
+  #hud-suspicion { display: block; height: 100%; width: 0%; background: #ffd640; transition: width 120ms linear; }
+  #alarm-banner {
+    width: 960px; max-width: 100%;
+    text-align: center; color: #ff5a5a;
+    font-weight: 700; letter-spacing: 4px; font-size: 15px;
+    padding: 2px 0 6px;
+    animation: blink 0.7s steps(2) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0.25; } }
+  .hidden { display: none !important; }
+  main { position: relative; width: 960px; max-width: 100%; }
+  canvas {
+    display: block; width: 100%; height: auto;
+    background: #10131c;
+    border: 1px solid #3a415a;
+    border-radius: 6px;
+    cursor: crosshair;
+  }
+  .overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; gap: 14px;
+    background: rgba(8, 10, 18, 0.82);
+    border-radius: 6px;
+    padding: 24px;
+  }
+  .overlay h2 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 40px; letter-spacing: 3px; color: #ffd640;
+  }
+  .overlay h2.lose { color: #ff5a5a; }
+  .overlay h2.win { color: #39d97e; }
+  .overlay p { max-width: 560px; line-height: 1.55; color: #c9cddd; font-size: 15px; }
+  .overlay p strong { color: #e8eaf2; }
+  .overlay .keys { font-size: 13px; color: #9aa0b5; }
+  .overlay .keys b { color: #ffd640; }
+  button {
+    font: inherit; font-size: 16px; font-weight: 700;
+    color: #10131c; background: #ffd640;
+    border: none; border-radius: 6px;
+    padding: 12px 28px; cursor: pointer;
+  }
+  button:hover { background: #ffdf6b; }
+  footer {
+    width: 960px; max-width: 100%;
+    padding-top: 8px;
+    font-size: 13px; color: #9aa0b5;
+    display: flex; justify-content: space-between; gap: 12px;
+  }
+  footer b { color: #c9cddd; }
+</style>
+</head>
+<body>
+<header>
+  <h1>NIGHT ARCHIVE <span>A STEALTH GAME</span></h1>
+  <div class="hud">
+    <span class="charts" id="hud-charts">Charts ◇◇◇ 0/3</span>
+    <span class="suspicion-wrap"><label>SEEN</label><span class="suspicion-bar"><span id="hud-suspicion"></span></span></span>
+    <span class="pebbles" id="hud-pebbles">Pebbles ×5</span>
+    <span class="timer" id="hud-timer">00:00</span>
+  </div>
+</header>
+<div id="alarm-banner" class="hidden">⚠ SPOTTED — BREAK LINE OF SIGHT ⚠</div>
+<main>
+  <canvas id="game" width="960" height="640"></canvas>
+  <div class="overlay" id="title-screen">
+    <h2>NIGHT ARCHIVE</h2>
+    <p>After midnight the archive belongs to its wardens. You are <strong>Wren</strong>, the night
+    archivist — pocket the <strong>three star charts</strong> and slip out the south door unseen.
+    Lantern light gives you away; shadow and bush keep you hidden. A warden who spots you
+    gives you a heartbeat to break away before the alarm sounds.</p>
+    <p class="keys"><b>WASD / arrows</b> move &nbsp;·&nbsp; <b>Shift</b> sneak &nbsp;·&nbsp;
+    <b>Click</b> throw a pebble &nbsp;·&nbsp; <b>R</b> restart</p>
+    <button id="start-button" type="button">Begin the night shift</button>
+  </div>
+  <div class="overlay hidden" id="win-screen">
+    <h2 class="win">OUT UNSEEN</h2>
+    <p id="win-stats"></p>
+    <p>The charts are back where they belong, and no warden ever knew you were there.</p>
+    <button id="again-win" type="button">Play again</button>
+  </div>
+  <div class="overlay hidden" id="lose-screen">
+    <h2 class="lose">CAUGHT</h2>
+    <p id="lose-stats"></p>
+    <p>The lanterns turn, the wardens close in, and the night shift ends in the archive's cells.</p>
+    <button id="again-lose" type="button">Try again</button>
+  </div>
+</main>
+<footer>
+  <span><b>Dark</b> hides you · <b>lit</b> floor exposes you · bushes slow the wardens' eyes</span>
+  <span>An original game — no assets, no network, all sound synthesized live</span>
+</footer>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
